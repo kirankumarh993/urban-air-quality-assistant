@@ -56,11 +56,10 @@ def main() -> None:
     summary = f"Decision {a.decision}; AQI {round(a.aqi)} ({a.category}); profile {profile}; activity {activity}. " + " ".join(a.tips + [a.mask])
     @st.fragment
     def _explain(summary):
+        if st.button("Explain in simple words (AI)"):
+           st.write(llm.explain(summary) or "AI explanation unavailable; see the advice above.")
 
-    if st.button("Explain in simple words (AI)"):
-        st.write(llm.explain(summary) or "AI explanation unavailable; see the advice above.")
-
-        _explain(summary)
+    _explain(summary)
 
 
 if __name__ == "__main__":
