@@ -1,5 +1,7 @@
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
+
 import requests
+
 from src import llm
 
 CTX = {"City": "Delhi, India", "US AQI": "312"}

@@ -126,7 +126,9 @@ COMMUTE_ALT = {
     "two_wheeler": "Use metro/bus for longer trips, or an electric two-wheeler; wear a fitted N95 in heavy traffic.",
     "bicycle": "Keep cycling (zero emissions) but pick low-traffic lanes and avoid peak rush hour.",
     "walk": "Keep walking (zero emissions); choose park or residential streets away from main roads.",
-    "public_transport": "Keep using public transport; it cuts emissions per person. Wait indoors until the vehicle arrives.",
+    "public_transport": (
+        "Keep using public transport; it cuts emissions per person. Wait indoors until the vehicle arrives."
+    ),
     "work_from_home": "Staying home avoids commute exposure and emissions; combine errands into one trip.",
 }
 IMPACT_TEXT = (

@@ -1,9 +1,19 @@
 import pytest
-from src import engine, validators, air_quality
+
+from src import air_quality, engine, validators
 
 
-@pytest.mark.parametrize("aqi,name", [(0, "Good"), (50, "Good"), (51, "Moderate"), (150, "Unhealthy for Sensitive Groups"),
-                                     (200, "Unhealthy"), (301, "Hazardous")])
+@pytest.mark.parametrize(
+        "aqi,name",
+        [
+            (0, "Good"),
+            (50, "Good"),
+            (51, "Moderate"),
+            (150, "Unhealthy for Sensitive Groups"),
+            (200, "Unhealthy"),
+            (301, "Hazardous"),
+        ]
+    )
 def test_categorize(aqi, name):
     assert engine.categorize(aqi)[0] == name
 

@@ -1,1 +1,4 @@
-line-length = 120\n\n[lint]\nselect = ["E", "F", "W", "I", "B"]\n
+line-length = 120
+
+[lint]
+select = ["E", "F", "W", "I", "B"]
