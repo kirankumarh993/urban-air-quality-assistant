@@ -17,7 +17,7 @@ def test_no_key_returns_none(monkeypatch):
 
 def test_success_and_cap(monkeypatch):
     monkeypatch.setenv("GEMINI_API_KEY", "k")
-    resp = MagicMock()
+    resp = MagicMock(status_code=200)
     resp.json.return_value = {"candidates": [{"content": {"parts": [{"text": "x" * 5000}]}}]}
     with patch("src.llm.requests.post", return_value=resp):
         assert len(llm.plan(CTX)) == llm.MAX_CHARS
@@ -27,3 +27,12 @@ def test_network_error_returns_none(monkeypatch):
     monkeypatch.setenv("GEMINI_API_KEY", "k")
     with patch("src.llm.requests.post", side_effect=requests.RequestException):
         assert llm.plan(CTX) is None
+
+
+def test_failure_records_reason(monkeypatch):
+    monkeypatch.setenv("GEMINI_API_KEY", "k")
+    resp = MagicMock(status_code=400)
+    resp.json.return_value = {"error": {"message": "API key not valid"}}
+    with patch("src.llm.requests.post", return_value=resp):
+        assert llm.plan(CTX) is None
+    assert "400" in llm.last_error

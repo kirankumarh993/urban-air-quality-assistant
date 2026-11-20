@@ -25,19 +25,41 @@ def build_prompt(ctx: Dict[str, str]) -> str:
     )
 
 
+last_error = ""
+
+
+def _models():
+    primary = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
+    return [primary] + [m for m in ("gemini-2.0-flash", "gemini-flash-latest") if m != primary]
+
+
 def plan(ctx: Dict[str, str]) -> Optional[str]:
+    """Return the Markdown plan, or None. The reason for a failure is kept in `last_error` (never the key)."""
+    global last_error
     key = os.environ.get("GEMINI_API_KEY")
     if not key:
+        last_error = "No GEMINI_API_KEY found in app secrets."
         return None
-    model = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
-    body = {"contents": [{"parts": [{"text": build_prompt(ctx)}]}],
-            "generationConfig": {"temperature": 0.4, "maxOutputTokens": 800,
-                                 "thinkingConfig": {"thinkingBudget": 0}}}
-    try:
-        r = requests.post(url, headers={"x-goog-api-key": key}, timeout=20, json=body)
-        r.raise_for_status()
-        text = r.json()["candidates"][0]["content"]["parts"][0]["text"]
-        return text.strip()[:MAX_CHARS] or None
-    except (requests.RequestException, KeyError, IndexError, ValueError):
-        return None
+    for model in _models():
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+        body = {"contents": [{"parts": [{"text": build_prompt(ctx)}]}],
+                "generationConfig": {"temperature": 0.4, "maxOutputTokens": 800}}
+        if model.startswith("gemini-2.5"):
+            body["generationConfig"]["thinkingConfig"] = {"thinkingBudget": 0}
+        try:
+            r = requests.post(url, headers={"x-goog-api-key": key}, timeout=20, json=body)
+            if r.status_code != 200:
+                try:
+                    msg = r.json().get("error", {}).get("message", "")
+                except ValueError:
+                    msg = ""
+                last_error = f"{model}: HTTP {r.status_code} {msg[:150]}"
+                continue
+            text = r.json()["candidates"][0]["content"]["parts"][0]["text"].strip()[:MAX_CHARS]
+            if text:
+                last_error = ""
+                return text
+            last_error = f"{model}: empty response"
+        except (requests.RequestException, KeyError, IndexError, ValueError) as exc:
+            last_error = f"{model}: {type(exc).__name__}"
+    return None
