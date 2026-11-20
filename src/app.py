@@ -160,14 +160,8 @@ def _render_plan(ctx: tuple, base: Dict[str, object]) -> None:
         _render_fallback(base, err)
 
 
-def main() -> None:
-    """Run the Streamlit app."""
-    st.set_page_config(page_title="Urban Air Quality Assistant", page_icon="🌫️")
-    st.title("Urban Air Quality Assistant")
-    st.caption("Personalised, plain-language air advice. General guidance only, not medical advice.")
-    raw = _read_form()
-    if raw is None:
-        return
+def _render_results(raw: Dict[str, object]) -> None:
+    """Validate the form values, load live data and render advice plus plan."""
     try:
         inputs = _validate(raw)
         place, data = load(inputs["city"])
@@ -178,7 +172,23 @@ def main() -> None:
                            data["times"], data["hourly_aqi"])
     _render_advice(place, data, advice)
     base = engine.lifestyle_plan(advice.risk_level, inputs["commute"], inputs["purifier"])
+    st.divider()
     _render_plan(_plan_context(place, advice, inputs), base)
+
+
+def main() -> None:
+    """Run the Streamlit app: inputs on the left, results on the right."""
+    st.set_page_config(page_title="Urban Air Quality Assistant", page_icon="🌫️", layout="wide")
+    st.title("Urban Air Quality Assistant")
+    st.caption("Personalised, plain-language air advice. General guidance only, not medical advice.")
+    left, right = st.columns([1, 2], gap="large")
+    with left:
+        raw = _read_form()
+    with right:
+        if raw is None:
+            st.info("Fill in your details on the left and press **Get advice** to see your air quality and plan here.")
+        else:
+            _render_results(raw)
 
 
 if __name__ == "__main__":
