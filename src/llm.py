@@ -40,7 +40,7 @@ def _call(model: str, key: str, ctx: Dict[str, str]):
     if model.startswith("gemini-2.5"):
         cfg["thinkingConfig"] = {"thinkingBudget": 0}
     body = {"contents": [{"parts": [{"text": build_prompt(ctx)}]}], "generationConfig": cfg}
-    return requests.post(url, headers={"x-goog-api-key": key}, timeout=20, json=body)
+    return requests.post(url, headers={"x-goog-api-key": key}, timeout=15, json=body)
 
 
 def plan(ctx: Dict[str, str]) -> Optional[str]:
@@ -50,31 +50,33 @@ def plan(ctx: Dict[str, str]) -> Optional[str]:
     if not key:
         last_error = "No GEMINI_API_KEY found in app secrets."
         return None
+    errors = []
     for model in _models():
         for attempt in range(2):
             try:
                 r = _call(model, key, ctx)
             except requests.RequestException as exc:
-                last_error = f"{model}: {type(exc).__name__}"
+                errors.append(f"{model}: {type(exc).__name__}")
                 break
             if r.status_code == 200:
                 try:
                     text = r.json()["candidates"][0]["content"]["parts"][0]["text"].strip()[:MAX_CHARS]
                 except (KeyError, IndexError, ValueError):
-                    last_error = f"{model}: unexpected response"
+                    errors.append(f"{model}: unexpected response")
                     break
                 if text:
                     last_error = ""
                     return text
-                last_error = f"{model}: empty response"
+                errors.append(f"{model}: empty response")
                 break
             try:
                 msg = r.json().get("error", {}).get("message", "")
             except ValueError:
                 msg = ""
-            last_error = f"{model}: HTTP {r.status_code} {msg[:120]}"
             if r.status_code in RETRY_STATUS and attempt == 0:
                 time.sleep(2)
                 continue
+            errors.append(f"{model}: HTTP {r.status_code} {msg[:100]}")
             break
+    last_error = " | ".join(errors)
     return None
