@@ -64,3 +64,23 @@ def test_parse():
     assert air_quality.parse_air_quality(d)["aqi"] == 80
     with pytest.raises(air_quality.AirQualityError):
         air_quality.parse_air_quality({})
+
+
+def test_lifestyle_plan_levels():
+    low = engine.lifestyle_plan(0, "car", False)
+    high = engine.lifestyle_plan(4, "bicycle", True)
+    assert "Normal routine" in low["routine"]
+    assert "Stay indoors" in high["routine"]
+    assert "HEPA" in " ".join(high["indoor"])
+    assert "purifier" in " ".join(low["indoor"]).lower()
+    assert "metro" in low["alternative"].lower()
+
+
+def test_lifestyle_unknown_commute_defaults():
+    assert engine.lifestyle_plan(2, "unknown", False)["alternative"]
+
+
+def test_commute_validation():
+    assert validators.clean_choice("car", validators.COMMUTES) == "car"
+    with pytest.raises(ValueError):
+        validators.clean_choice("rocket", validators.COMMUTES)

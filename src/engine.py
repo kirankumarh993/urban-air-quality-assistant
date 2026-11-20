@@ -87,3 +87,30 @@ def advise(aqi: float, profile: str, activity: str, minutes: int,
         tips.append("Carry your prescribed medication and stop if you feel symptoms.")
     window = best_window(times, hourly, 1) if times and hourly else None
     return Advice(aqi, cat, base, lvl, decision, mask_advice(lvl, activity), tips, window)
+
+
+COMMUTE_ALT = {
+    "car": "Switch some car trips to metro/bus or carpool; fewer cars means less exhaust at street level.",
+    "two_wheeler": "Use metro/bus for longer trips, or an electric two-wheeler; wear a fitted N95 in heavy traffic.",
+    "bicycle": "Keep cycling (zero emissions) but pick low-traffic lanes and avoid peak rush hour.",
+    "walk": "Keep walking (zero emissions); choose park or residential streets away from main roads.",
+    "public_transport": "Keep using public transport; it cuts emissions per person. Wait indoors until the vehicle arrives.",
+    "work_from_home": "Staying home avoids commute exposure and emissions; combine errands into one trip.",
+}
+
+
+def lifestyle_plan(level: int, commute: str, has_purifier: bool) -> dict:
+    """Deterministic fallback plan: routine, indoor hacks, sustainable alternative and impact."""
+    if level <= 1:
+        routine = "Normal routine is fine. Do outdoor errands and exercise now, and ventilate rooms."
+    elif level <= 3:
+        routine = "Shift outdoor tasks to the cleanest hour, keep them short, and avoid busy roads."
+    else:
+        routine = "Stay indoors where possible, postpone outdoor exercise, and combine errands into one trip."
+    indoor = ["Keep windows closed during peak pollution." if level >= 2 else "Ventilate briefly while air is clean.",
+              "Use a HEPA purifier in the room you use most." if has_purifier
+              else "No purifier? Keep windows shut, damp-mop floors, and avoid burning incense or candles.",
+              "Do not sweep dry or burn waste; both add indoor particles."]
+    impact = ("Cutting one car trip avoids tailpipe PM2.5 and CO2 and lowers street-level pollution for your family. "
+              "Staying indoors in a closed, clean room can sharply cut the particles you breathe on bad days.")
+    return {"routine": routine, "indoor": indoor, "alternative": COMMUTE_ALT.get(commute, COMMUTE_ALT["walk"]), "impact": impact}

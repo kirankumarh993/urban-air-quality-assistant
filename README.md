@@ -9,7 +9,7 @@
    - AQI -> EPA category (Good ... Hazardous).
    - Sensitive groups get a *lower effective threshold* (risk shift), and intense activities add more.
    - Output: risk level, go / modify / avoid decision, mask guidance (N95/FFP2 when needed), ventilation tip, and the **best time window** in the next 24 h found from the hourly forecast.
-4. **Optional GenAI (`src/llm.py`):** Gemini rewrites the rule-based result in plain, friendly language. The rules decide; the LLM never changes the decision. Without a key the app falls back to the built-in text.
+4. **GenAI personalised plan (`src/llm.py`, Gemini):** given verified facts (city, AQI, profile, activity, daily travel, purifier) it writes four sections: low-emission routine, indoor air hacks, sustainable alternatives, and the direct impact of the user's choices. The rules decide GO/MODIFY/AVOID; the LLM never changes it. Without a key a built-in rule-based plan is shown.
 
 ## How it works
 ```bash
@@ -39,3 +39,16 @@ Optional: copy `.env.example` to `.env` or set `GEMINI_API_KEY` in your environm
 
 ## Testing
 `pytest` covers category boundaries, risk shifts, best-window search, validators and API parsing (mocked network).
+
+## How GenAI was used (tools, prompt flow, human vs AI)
+**Tools and why**
+- **Gemini API (gemini-2.5-flash):** fast, low-cost, free tier; generates the personalised plan at runtime.
+- **Open-Meteo:** free live air-quality data, no key needed.
+- **Streamlit Community Cloud:** quick public deployment.
+- **AI coding assistant (FordLLM):** scaffolding, debugging and test drafting during development.
+
+**Prompt flow:** UI inputs -> validators (whitelist) -> live AQI -> rule engine (decision, risk, best hour) -> structured prompt (system rules + fact list + four fixed headings, word limit) -> Gemini -> length-capped Markdown -> UI. If the call fails, `engine.lifestyle_plan` supplies the same four sections.
+
+**How prompts evolved:** v1 only rewrote the advice in three friendly sentences. v2 added lifestyle inputs and four fixed sections so output covers routines, indoor hacks, sustainable alternatives and impact. Guardrails were added: fixed decision, no medical claims, context treated as data.
+
+**GenAI handled vs human designed:** GenAI writes the personalised wording and suggestions. Humans designed the risk rules, thresholds, validation, security limits, fallback, tests and UI.

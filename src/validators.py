@@ -2,6 +2,7 @@
 import re
 
 PROFILES = ("healthy", "asthma_respiratory", "heart_condition", "child", "older_adult", "pregnant")
+COMMUTES = ("walk", "bicycle", "public_transport", "car", "two_wheeler", "work_from_home")
 ACTIVITIES = ("walk", "commute", "run", "cycle", "outdoor_work", "ventilate_home")
 _CITY_RE = re.compile(r"^[\w\s\-\.,']{2,60}$", re.UNICODE)
 
