@@ -29,18 +29,16 @@ def build_prompt(ctx: Dict[str, str]) -> str:
 
 
 def _models():
-    primary = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
-    fallbacks = ("gemini-2.5-flash-lite", "gemini-2.0-flash", "gemini-flash-latest")
+    primary = os.environ.get("GEMINI_MODEL", "gemini-3.8-flash")
+    fallbacks = ("gemini-3.1-flash-lite", "gemini-3.5-flash-lite", "gemini-3.6-flash")
     return [primary] + [m for m in fallbacks if m != primary]
 
 
 def _call(model: str, key: str, ctx: Dict[str, str]):
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
-    cfg = {"temperature": 0.4, "maxOutputTokens": 800}
-    if model.startswith("gemini-2.5"):
-        cfg["thinkingConfig"] = {"thinkingBudget": 0}
+    cfg = {"temperature": 0.4, "maxOutputTokens": 2000}
     body = {"contents": [{"parts": [{"text": build_prompt(ctx)}]}], "generationConfig": cfg}
-    return requests.post(url, headers={"x-goog-api-key": key}, timeout=15, json=body)
+    return requests.post(url, headers={"x-goog-api-key": key}, timeout=25, json=body)
 
 
 def plan(ctx: Dict[str, str]) -> Optional[str]:
@@ -60,7 +58,8 @@ def plan(ctx: Dict[str, str]) -> Optional[str]:
                 break
             if r.status_code == 200:
                 try:
-                    text = r.json()["candidates"][0]["content"]["parts"][0]["text"].strip()[:MAX_CHARS]
+                    parts = r.json()["candidates"][0]["content"]["parts"]
+                    text = "".join(p.get("text", "") for p in parts if not p.get("thought")).strip()[:MAX_CHARS]
                 except (KeyError, IndexError, ValueError):
                     errors.append(f"{model}: unexpected response")
                     break
