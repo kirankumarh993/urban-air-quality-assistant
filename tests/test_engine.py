@@ -55,7 +55,9 @@ def test_ventilate_advice():
 
 def test_city_validation():
     assert validators.clean_city("  New Delhi ") == "New Delhi"
-    for bad in ["", "<script>", "a", "x" * 61]:
+    assert validators.clean_city("St. John's, Canada") == "St. John's, Canada"
+    assert validators.clean_city("São Paulo") == "São Paulo"
+    for bad in ["", "<script>", "a", "x" * 61, "Delhi123", "_city", "12"]:
         with pytest.raises(ValueError):
             validators.clean_city(bad)
 

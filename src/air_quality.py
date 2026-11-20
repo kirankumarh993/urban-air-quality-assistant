@@ -1,5 +1,5 @@
 """Open-Meteo client (HTTPS, timeouts, parsed output)."""
-from typing import Dict
+from typing import Dict, List, Optional, Tuple
 
 import requests
 
@@ -42,19 +42,29 @@ def geocode(city: str) -> Dict:
     }
 
 
+def _upcoming(times: List[str], values: List, current_time: Optional[str]) -> Tuple[List[str], List]:
+    """Return the hourly entries from the current hour onwards (all of them if the time is unknown)."""
+    if not current_time:
+        return times, values
+    cutoff = current_time[:13] + ":00"  # ISO strings compare correctly; drop minutes
+    start = next((i for i, t in enumerate(times) if t >= cutoff), len(times))
+    return times[start:], values[start:]
+
+
 def parse_air_quality(data: Dict) -> Dict:
-    """Extract current AQI/PM values and the next 24 hourly AQIs from an API response."""
+    """Extract current AQI/PM values and the next 24 hourly AQIs (starting from the current hour)."""
     try:
         current = data["current"]
         hourly = data["hourly"]
+        times, aqis = _upcoming(hourly["time"], hourly["us_aqi"], current.get("time"))
         return {
             "aqi": current["us_aqi"],
             "pm25": current.get("pm2_5"),
             "pm10": current.get("pm10"),
-            "times": hourly["time"][:HOURS_SHOWN],
-            "hourly_aqi": hourly["us_aqi"][:HOURS_SHOWN],
+            "times": times[:HOURS_SHOWN],
+            "hourly_aqi": aqis[:HOURS_SHOWN],
         }
-    except (KeyError, TypeError) as exc:
+    except (KeyError, TypeError, AttributeError) as exc:
         raise AirQualityError("Unexpected air-quality data format.") from exc
 
 

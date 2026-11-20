@@ -55,3 +55,15 @@ def test_invalid_json_is_wrapped():
     with patch("src.air_quality.requests.get", return_value=resp):
         with pytest.raises(air_quality.AirQualityError):
             air_quality.fetch_air_quality(1.0, 2.0)
+
+
+def test_hours_start_from_current_hour():
+    times = [f"2026-11-20T{h:02d}:00" for h in range(24)] + [f"2026-11-21T{h:02d}:00" for h in range(24)]
+    data = {
+        "current": {"us_aqi": 80, "time": "2026-11-20T20:15"},
+        "hourly": {"time": times, "us_aqi": list(range(48))},
+    }
+    parsed = air_quality.parse_air_quality(data)
+    assert parsed["times"][0] == "2026-11-20T20:00"
+    assert parsed["hourly_aqi"][0] == 20
+    assert len(parsed["times"]) == air_quality.HOURS_SHOWN

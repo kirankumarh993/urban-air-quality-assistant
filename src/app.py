@@ -35,8 +35,7 @@ ACT = {
 }
 CACHE_TTL_S = 900
 DEFAULT_CITY = "Delhi"
-MAX_CITY_CHARS = 60
-MIN_MINUTES, MAX_MINUTES, DEFAULT_MINUTES, MINUTES_STEP = 5, 600, 45, 5
+DEFAULT_MINUTES, MINUTES_STEP = 45, 5
 API_KEY_NAME = "GEMINI_API_KEY"
 
 
@@ -69,10 +68,12 @@ def _ensure_api_key() -> None:
 def _read_form() -> Optional[Dict[str, object]]:
     """Render the input form; return the raw values once submitted, else None."""
     with st.form("ctx"):
-        city = st.text_input("City", DEFAULT_CITY, max_chars=MAX_CITY_CHARS, help="Type a city name")
+        city = st.text_input("City", DEFAULT_CITY, max_chars=validators.MAX_CITY_CHARS, help="Type a city name")
         profile = st.selectbox("Health profile", list(LABELS), format_func=LABELS.get)
         activity = st.selectbox("Planned activity", list(ACT), format_func=ACT.get)
-        minutes = st.number_input("Duration (minutes)", MIN_MINUTES, MAX_MINUTES, DEFAULT_MINUTES, step=MINUTES_STEP)
+        minutes = st.number_input(
+            "Duration (minutes)", validators.MIN_MINUTES, validators.MAX_MINUTES, DEFAULT_MINUTES, step=MINUTES_STEP
+        )
         commute = st.selectbox("Usual daily travel", list(COMMUTE), format_func=COMMUTE.get)
         purifier = st.checkbox("I have an air purifier at home")
         submitted = st.form_submit_button("Get advice")

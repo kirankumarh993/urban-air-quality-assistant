@@ -4,7 +4,7 @@
 
 ## Approach and logic
 1. **Context in:** city, health profile (asthma/respiratory, heart condition, child, older adult, pregnant, healthy), planned activity (walk, commute, run, cycle, outdoor work, windows/ventilation) and duration.
-2. **Live data:** Open-Meteo Geocoding + Air Quality APIs (free, no API key). Current and 48 h hourly US AQI, PM2.5, PM10.
+2. **Live data:** Open-Meteo Geocoding + Air Quality APIs (free, no API key). Current US AQI, PM2.5, PM10 and the hourly US AQI for the next 24 h (from the current hour).
 3. **Transparent rule engine (`src/engine.py`, pure functions):**
    - AQI -> EPA category (Good ... Hazardous).
    - Sensitive groups get a *lower effective threshold* (risk shift), and intense activities add more.
@@ -24,12 +24,12 @@ Optional: copy `.env.example` to `.env` or set `GEMINI_API_KEY` in your environm
 ## Project structure
 ```
 src/
-  app.py          Streamlit UI (small render/validate helpers)
+  app.py          Streamlit UI: wide two-column layout, inputs left and results right
   engine.py       Pure decision logic: category, risk level, GO/MODIFY/AVOID, fallback plan
   air_quality.py  Open-Meteo client (geocoding + air quality, timeouts, error mapping)
   validators.py   Input whitelisting and sanitising
   llm.py          Gemini wrapper: retries, model fallback, never exposes the key
-tests/            pytest suites for engine, validators, API client and Gemini wrapper (network mocked)
+tests/            pytest suites for the engine and validators (`test_engine.py`), API client and Gemini wrapper (network mocked)
 ruff.toml         Linter settings (line length 120)
 pytest.ini        Test settings
 ```
