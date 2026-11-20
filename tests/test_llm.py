@@ -36,3 +36,34 @@ def test_failure_records_reason(monkeypatch):
     with patch("src.llm.requests.post", return_value=resp):
         assert llm.plan(CTX) is None
     assert "400" in llm.last_error
+
+
+def test_retries_transient_error_then_succeeds(monkeypatch):
+    monkeypatch.setenv("GEMINI_API_KEY", "k")
+    monkeypatch.setattr("src.llm.time.sleep", lambda _s: None)
+    bad = MagicMock(status_code=503)
+    bad.json.return_value = {}
+    good = MagicMock(status_code=200)
+    good.json.return_value = {"candidates": [{"content": {"parts": [{"text": "ok"}]}}]}
+    with patch("src.llm.requests.post", side_effect=[bad, good]):
+        assert llm.plan(CTX) == "ok"
+    assert llm.last_error == ""
+
+
+def test_falls_back_to_next_model_on_404(monkeypatch):
+    monkeypatch.setenv("GEMINI_API_KEY", "k")
+    gone = MagicMock(status_code=404)
+    gone.json.return_value = {"error": {"message": "no longer available"}}
+    good = MagicMock(status_code=200)
+    good.json.return_value = {"candidates": [{"content": {"parts": [{"text": "hi"}]}}]}
+    with patch("src.llm.requests.post", side_effect=[gone, good]):
+        assert llm.plan(CTX) == "hi"
+
+
+def test_thought_parts_are_ignored(monkeypatch):
+    monkeypatch.setenv("GEMINI_API_KEY", "k")
+    resp = MagicMock(status_code=200)
+    resp.json.return_value = {"candidates": [{"content": {"parts": [
+        {"thought": True, "text": "thinking"}, {"text": "answer"}]}}]}
+    with patch("src.llm.requests.post", return_value=resp):
+        assert llm.plan(CTX) == "answer"

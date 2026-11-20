@@ -1,21 +1,32 @@
 """Pure decision logic: AQI + user context -> advice."""
 from dataclasses import dataclass, field
-from typing import List, Optional, Sequence, Tuple
+from typing import Dict, List, Optional, Sequence, Tuple
 
-CATEGORIES = [  # (upper bound, name, level 0-5)
+# (upper AQI bound, category name, level 0-5)
+CATEGORIES = [
     (50, "Good", 0),
     (100, "Moderate", 1),
     (150, "Unhealthy for Sensitive Groups", 2),
     (200, "Unhealthy", 3),
     (300, "Very Unhealthy", 4),
-    (10**6, "Hazardous", 5),
+    (float("inf"), "Hazardous", 5),
 ]
 SENSITIVE = {"asthma_respiratory": 2, "heart_condition": 2, "child": 1, "older_adult": 1, "pregnant": 1, "healthy": 0}
 INTENSITY = {"ventilate_home": 0, "walk": 0, "commute": 0, "cycle": 1, "outdoor_work": 1, "run": 2}
 
+MAX_LEVEL = 5
+LONG_EXPOSURE_MINUTES = 120
+GO_MAX_LEVEL = 1
+MODIFY_MAX_LEVEL = 3
+MASK_OPTIONAL_LEVEL = 2
+MEDICATION_TIP_LEVEL = 2
+MEDICATION_PROFILES = ("asthma_respiratory", "heart_condition")
+
 
 @dataclass
 class Advice:
+    """Result of :func:`advise`."""
+
     aqi: float
     category: str
     base_level: int
@@ -27,12 +38,13 @@ class Advice:
 
 
 def categorize(aqi: float) -> Tuple[str, int]:
+    """Return ``(category name, level 0-5)`` for a US AQI value."""
     if aqi < 0:
         raise ValueError("AQI cannot be negative")
     for upper, name, level in CATEGORIES:
         if aqi <= upper:
             return name, level
-    raise AssertionError("unreachable")
+    raise ValueError(f"AQI is not a number: {aqi!r}")  # only reachable for NaN
 
 
 def risk_level(aqi: float, profile: str, activity: str, minutes: int = 30) -> int:
@@ -41,52 +53,72 @@ def risk_level(aqi: float, profile: str, activity: str, minutes: int = 30) -> in
     if base == 0:
         return 0  # clean air: no shift
     shift = SENSITIVE.get(profile, 0) + INTENSITY.get(activity, 0)
-    shift = (shift + 1) // 2 + (1 if minutes > 120 and shift else 0)
-    return min(5, base + shift)
+    long_exposure = 1 if minutes > LONG_EXPOSURE_MINUTES and shift else 0
+    shift = (shift + 1) // 2 + long_exposure
+    return min(MAX_LEVEL, base + shift)
+
+
+def decide(level: int) -> str:
+    """Map a risk level to GO / MODIFY / AVOID."""
+    if level <= GO_MAX_LEVEL:
+        return "GO"
+    return "MODIFY" if level <= MODIFY_MAX_LEVEL else "AVOID"
 
 
 def mask_advice(level: int, activity: str) -> str:
-    if activity == "ventilate_home" or level <= 1:
+    """Return mask guidance for a risk level and activity."""
+    if activity == "ventilate_home" or level <= GO_MAX_LEVEL:
         return "No mask needed."
-    if level == 2:
+    if level == MASK_OPTIONAL_LEVEL:
         return "A well-fitted mask is optional but helpful in traffic."
     return "Wear a well-fitted N95/FFP2 respirator outdoors."
 
 
-def best_window(times: Sequence[str], aqis: Sequence[Optional[float]], hours: int = 1) -> Optional[Tuple[str, float]]:
+def best_window(
+    times: Sequence[str], aqis: Sequence[Optional[float]], hours: int = 1
+) -> Optional[Tuple[str, float]]:
     """Return (start time, avg AQI) of the cleanest window of `hours` consecutive hours."""
-    best = None
+    best: Optional[Tuple[str, float]] = None
     for i in range(len(aqis) - hours + 1):
-        win = aqis[i:i + hours]
-        if any(v is None for v in win):
+        window = aqis[i:i + hours]
+        if any(v is None for v in window):
             continue
-        avg = sum(win) / hours
+        avg = sum(window) / hours
         if best is None or avg < best[1]:
             best = (times[i], round(avg, 1))
     return best
 
 
-def advise(aqi: float, profile: str, activity: str, minutes: int,
-           times: Sequence[str] = (), hourly: Sequence[Optional[float]] = ()) -> Advice:
-    cat, base = categorize(aqi)
-    lvl = risk_level(aqi, profile, activity, minutes)
+def _activity_tip(activity: str, decision: str) -> str:
+    """Return the main tip for the activity and decision."""
     if activity == "ventilate_home":
-        decision = "GO" if lvl <= 1 else ("MODIFY" if lvl <= 3 else "AVOID")
-    else:
-        decision = "GO" if lvl <= 1 else ("MODIFY" if lvl <= 3 else "AVOID")
-    tips: List[str] = []
-    if activity == "ventilate_home":
-        tips.append("Open windows briefly now." if decision == "GO" else "Keep windows closed; use a HEPA purifier if available.")
-    elif decision == "GO":
-        tips.append("Air is fine for your plan. Enjoy it.")
-    elif decision == "MODIFY":
-        tips.append("Shorten the session, lower the intensity, or pick a park/low-traffic route.")
-    else:
-        tips.append("Avoid outdoor exertion now; move the activity indoors or reschedule.")
-    if profile in ("asthma_respiratory", "heart_condition") and lvl >= 2:
+        if decision == "GO":
+            return "Open windows briefly now."
+        return "Keep windows closed; use a HEPA purifier if available."
+    if decision == "GO":
+        return "Air is fine for your plan. Enjoy it."
+    if decision == "MODIFY":
+        return "Shorten the session, lower the intensity, or pick a park/low-traffic route."
+    return "Avoid outdoor exertion now; move the activity indoors or reschedule."
+
+
+def advise(
+    aqi: float,
+    profile: str,
+    activity: str,
+    minutes: int,
+    times: Sequence[str] = (),
+    hourly: Sequence[Optional[float]] = (),
+) -> Advice:
+    """Combine AQI and user context into a decision, tips, mask advice and cleanest hour."""
+    category, base = categorize(aqi)
+    level = risk_level(aqi, profile, activity, minutes)
+    decision = decide(level)
+    tips = [_activity_tip(activity, decision)]
+    if profile in MEDICATION_PROFILES and level >= MEDICATION_TIP_LEVEL:
         tips.append("Carry your prescribed medication and stop if you feel symptoms.")
     window = best_window(times, hourly, 1) if times and hourly else None
-    return Advice(aqi, cat, base, lvl, decision, mask_advice(lvl, activity), tips, window)
+    return Advice(aqi, category, base, level, decision, mask_advice(level, activity), tips, window)
 
 
 COMMUTE_ALT = {
@@ -97,20 +129,36 @@ COMMUTE_ALT = {
     "public_transport": "Keep using public transport; it cuts emissions per person. Wait indoors until the vehicle arrives.",
     "work_from_home": "Staying home avoids commute exposure and emissions; combine errands into one trip.",
 }
+IMPACT_TEXT = (
+    "Cutting one car trip avoids tailpipe PM2.5 and CO2 and lowers street-level pollution for your family. "
+    "Staying indoors in a closed, clean room can sharply cut the particles you breathe on bad days."
+)
 
 
-def lifestyle_plan(level: int, commute: str, has_purifier: bool) -> dict:
-    """Deterministic fallback plan: routine, indoor hacks, sustainable alternative and impact."""
-    if level <= 1:
-        routine = "Normal routine is fine. Do outdoor errands and exercise now, and ventilate rooms."
-    elif level <= 3:
-        routine = "Shift outdoor tasks to the cleanest hour, keep them short, and avoid busy roads."
+def _routine(level: int) -> str:
+    """Return the daily-routine line for a risk level."""
+    if level <= GO_MAX_LEVEL:
+        return "Normal routine is fine. Do outdoor errands and exercise now, and ventilate rooms."
+    if level <= MODIFY_MAX_LEVEL:
+        return "Shift outdoor tasks to the cleanest hour, keep them short, and avoid busy roads."
+    return "Stay indoors where possible, postpone outdoor exercise, and combine errands into one trip."
+
+
+def _indoor_tips(level: int, has_purifier: bool) -> List[str]:
+    """Return three indoor-air tips."""
+    windows = "Keep windows closed during peak pollution." if level >= 2 else "Ventilate briefly while air is clean."
+    if has_purifier:
+        purifier = "Use a HEPA purifier in the room you use most."
     else:
-        routine = "Stay indoors where possible, postpone outdoor exercise, and combine errands into one trip."
-    indoor = ["Keep windows closed during peak pollution." if level >= 2 else "Ventilate briefly while air is clean.",
-              "Use a HEPA purifier in the room you use most." if has_purifier
-              else "No purifier? Keep windows shut, damp-mop floors, and avoid burning incense or candles.",
-              "Do not sweep dry or burn waste; both add indoor particles."]
-    impact = ("Cutting one car trip avoids tailpipe PM2.5 and CO2 and lowers street-level pollution for your family. "
-              "Staying indoors in a closed, clean room can sharply cut the particles you breathe on bad days.")
-    return {"routine": routine, "indoor": indoor, "alternative": COMMUTE_ALT.get(commute, COMMUTE_ALT["walk"]), "impact": impact}
+        purifier = "No purifier? Keep windows shut, damp-mop floors, and avoid burning incense or candles."
+    return [windows, purifier, "Do not sweep dry or burn waste; both add indoor particles."]
+
+
+def lifestyle_plan(level: int, commute: str, has_purifier: bool) -> Dict[str, object]:
+    """Deterministic fallback plan: routine, indoor hacks, sustainable alternative and impact."""
+    return {
+        "routine": _routine(level),
+        "indoor": _indoor_tips(level, has_purifier),
+        "alternative": COMMUTE_ALT.get(commute, COMMUTE_ALT["walk"]),
+        "impact": IMPACT_TEXT,
+    }

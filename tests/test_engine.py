@@ -84,3 +84,25 @@ def test_commute_validation():
     assert validators.clean_choice("car", validators.COMMUTES) == "car"
     with pytest.raises(ValueError):
         validators.clean_choice("rocket", validators.COMMUTES)
+
+
+def test_decide_thresholds():
+    assert [engine.decide(n) for n in range(6)] == ["GO", "GO", "MODIFY", "MODIFY", "AVOID", "AVOID"]
+
+
+def test_extreme_aqi_is_hazardous():
+    assert engine.categorize(10**9) == ("Hazardous", 5)
+
+
+def test_medication_tip_for_sensitive_profile():
+    tips = engine.advise(180, "asthma_respiratory", "walk", 30).tips
+    assert any("medication" in t for t in tips)
+
+
+def test_long_exposure_raises_risk():
+    assert engine.risk_level(120, "child", "cycle", 200) > engine.risk_level(120, "child", "cycle", 30)
+
+
+def test_mask_levels():
+    assert engine.mask_advice(2, "walk").startswith("A well-fitted")
+    assert engine.mask_advice(4, "ventilate_home") == "No mask needed."

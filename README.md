@@ -17,8 +17,27 @@ python -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
 streamlit run src/app.py
 pytest -q
+ruff check .   # optional: pip install ruff
 ```
 Optional: copy `.env.example` to `.env` or set `GEMINI_API_KEY` in your environment / Streamlit secrets.
+
+## Project structure
+```
+src/
+  app.py          Streamlit UI (small render/validate helpers)
+  engine.py       Pure decision logic: category, risk level, GO/MODIFY/AVOID, fallback plan
+  air_quality.py  Open-Meteo client (geocoding + air quality, timeouts, error mapping)
+  validators.py   Input whitelisting and sanitising
+  llm.py          Gemini wrapper: retries, model fallback, never exposes the key
+tests/            pytest suites for engine, validators, API client and Gemini wrapper (network mocked)
+ruff.toml         Linter settings (line length 120)
+pytest.ini        Test settings
+```
+
+## Code quality
+- Small single-purpose functions, type hints and docstrings throughout.
+- Named constants instead of magic numbers; no duplicated logic.
+- Specific exception handling; failures return clear user-facing messages.
 
 ## Assumptions
 - US AQI scale; Open-Meteo modelled data may differ from local ground stations.
@@ -38,11 +57,11 @@ Optional: copy `.env.example` to `.env` or set `GEMINI_API_KEY` in your environm
 - Labelled native widgets, keyboard-operable, risk conveyed by text + emoji (not colour alone), plain language, clear error messages.
 
 ## Testing
-`pytest` covers category boundaries, risk shifts, best-window search, validators and API parsing (mocked network).
+`pytest` covers category boundaries, risk shifts, decision thresholds, best-window search, validators, the Open-Meteo client and the Gemini wrapper (retry, model fallback, error reasons). All network calls are mocked.
 
 ## How GenAI was used (tools, prompt flow, human vs AI)
 **Tools and why**
-- **Gemini API (gemini-2.5-flash):** fast, low-cost, free tier; generates the personalised plan at runtime.
+- **Gemini API (default `gemini-3.8-flash`, with automatic fallback to other Flash models):** fast, low-cost, free tier; generates the personalised plan at runtime.
 - **Open-Meteo:** free live air-quality data, no key needed.
 - **Streamlit Community Cloud:** quick public deployment.
 - **AI coding assistant (FordLLM):** scaffolding, debugging and test drafting during development.
