@@ -1,4 +1,5 @@
 """Pure decision logic: AQI + user context -> advice."""
+import math
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Sequence, Tuple
 
@@ -39,12 +40,14 @@ class Advice:
 
 def categorize(aqi: float) -> Tuple[str, int]:
     """Return ``(category name, level 0-5)`` for a US AQI value."""
+    if not math.isfinite(aqi):
+        raise ValueError(f"AQI must be a finite number: {aqi!r}")
     if aqi < 0:
         raise ValueError("AQI cannot be negative")
     for upper, name, level in CATEGORIES:
         if aqi <= upper:
             return name, level
-    raise ValueError(f"AQI is not a number: {aqi!r}")  # only reachable for NaN
+    return "Hazardous", MAX_LEVEL
 
 
 def risk_level(aqi: float, profile: str, activity: str, minutes: int = 30) -> int:

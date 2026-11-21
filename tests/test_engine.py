@@ -23,6 +23,13 @@ def test_negative_aqi():
         engine.categorize(-1)
 
 
+def test_non_finite_aqi():
+    with pytest.raises(ValueError):
+        engine.categorize(float("nan"))
+    with pytest.raises(ValueError):
+        engine.categorize(float("inf"))
+
+
 def test_sensitive_higher_risk():
     assert engine.risk_level(120, "asthma_respiratory", "run") > engine.risk_level(120, "healthy", "walk")
 

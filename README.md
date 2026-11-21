@@ -15,11 +15,11 @@
 ```bash
 python -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
-streamlit run src/app.py
+export GEMINI_API_KEY="your-key"   # optional; or set in .streamlit/secrets.toml
+python -m streamlit run src/app.py
 pytest -q
 ruff check .   # optional: pip install ruff
 ```
-Optional: copy `.env.example` to `.env` or set `GEMINI_API_KEY` in your environment / Streamlit secrets.
 
 ## Project structure
 ```
@@ -28,15 +28,15 @@ src/
   engine.py       Pure decision logic: category, risk level, GO/MODIFY/AVOID, fallback plan
   air_quality.py  Open-Meteo client (geocoding + air quality, timeouts, error mapping)
   validators.py   Input whitelisting and sanitising
-  llm.py          Gemini wrapper: retries, model fallback, never exposes the key
-tests/            pytest suites for the engine and validators (`test_engine.py`), API client and Gemini wrapper (network mocked)
+  llm.py          Gemini wrapper: stateless PlanResult, retries, model fallback, never exposes the key
+tests/            pytest suites for the engine, validators, UI helpers, API client, and Gemini wrapper
 ruff.toml         Linter settings (line length 120)
 pytest.ini        Test settings
 ```
 
 ## Code quality
 - Small single-purpose functions, type hints and docstrings throughout.
-- Named constants instead of magic numbers; no duplicated logic.
+- Named constants instead of magic numbers; stateless result objects instead of mutable globals.
 - Specific exception handling; failures return clear user-facing messages.
 
 ## Assumptions
@@ -45,7 +45,7 @@ pytest.ini        Test settings
 - Risk-shift values are simplified from public EPA/WHO guidance.
 
 ## Security
-- No secrets in repo; keys come from environment variables.
+- No secrets in repo; keys come from environment variables or Streamlit secrets.
 - Input is validated, length-limited and whitelisted (`validators.py`); API calls use timeouts and HTTPS only.
 - Output rendered as text (no unsafe HTML); LLM output is length-capped and never drives decisions.
 - Pinned dependency ranges.
@@ -54,14 +54,14 @@ pytest.ini        Test settings
 - `st.cache_data` with TTL caches geocoding and air-quality calls; one request per city; LLM called only on user click.
 
 ## Accessibility
-- Labelled native widgets, keyboard-operable, risk conveyed by text + emoji (not colour alone), plain language, clear error messages.
+- Labelled native widgets with contextual `help` tooltips, keyboard-operable, risk conveyed by explicit text severity badges + emoji (not colour alone), plain language, clear error messages.
 
 ## Testing
-`pytest` covers category boundaries, risk shifts, decision thresholds, best-window search, validators, the Open-Meteo client and the Gemini wrapper (retry, model fallback, error reasons). All network calls are mocked.
+`pytest` covers category boundaries, risk shifts, decision thresholds, best-window search, validators, UI validation/context helpers, the Open-Meteo client, and the Gemini wrapper (retry, model fallback, error reasons). All network calls are mocked.
 
 ## How GenAI was used (tools, prompt flow, human vs AI)
 **Tools and why**
-- **Gemini API (default `gemini-3.8-flash`, with automatic fallback to other Flash models):** fast, low-cost, free tier; generates the personalised plan at runtime.
+- **Gemini API (default `gemini-2.5-flash`, with automatic fallback to other Flash models):** fast, low-cost, free tier; generates the personalised plan at runtime.
 - **Open-Meteo:** free live air-quality data, no key needed.
 - **Streamlit Community Cloud:** quick public deployment.
 - **AI coding assistant (FordLLM):** scaffolding, debugging and test drafting during development.

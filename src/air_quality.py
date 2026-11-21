@@ -56,9 +56,12 @@ def parse_air_quality(data: Dict) -> Dict:
     try:
         current = data["current"]
         hourly = data["hourly"]
+        aqi = current["us_aqi"]
+        if aqi is None:
+            raise AirQualityError("No AQI data available for this location.")
         times, aqis = _upcoming(hourly["time"], hourly["us_aqi"], current.get("time"))
         return {
-            "aqi": current["us_aqi"],
+            "aqi": aqi,
             "pm25": current.get("pm2_5"),
             "pm10": current.get("pm10"),
             "times": times[:HOURS_SHOWN],
@@ -79,7 +82,4 @@ def fetch_air_quality(lat: float, lon: float) -> Dict:
         "timezone": "auto",
     }
     data = _get_json(AQ_URL, params, "Air-quality service unavailable. Try again shortly.")
-    parsed = parse_air_quality(data)
-    if parsed["aqi"] is None:
-        raise AirQualityError("No AQI data available for this location.")
-    return parsed
+    return parse_air_quality(data)
