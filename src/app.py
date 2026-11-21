@@ -4,7 +4,13 @@ from typing import Dict, Optional, Tuple
 
 import streamlit as st
 
-from src import air_quality, engine, llm, validators
+try:
+    from src import air_quality, engine, llm, validators
+except ImportError:
+    import air_quality  # type: ignore[no-redef]
+    import engine  # type: ignore[no-redef]
+    import llm  # type: ignore[no-redef]
+    import validators  # type: ignore[no-redef]
 
 RISK_BADGE = {
     0: "🟢 Low Risk",
