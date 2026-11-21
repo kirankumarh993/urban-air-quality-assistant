@@ -13,8 +13,8 @@ from typing import Dict, List, Optional, Tuple
 import requests
 
 API_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
-DEFAULT_MODEL = "gemini-2.5-flash"
-FALLBACK_MODELS = ("gemini-2.5-flash-lite", "gemini-2.0-flash")
+DEFAULT_MODEL = "gemini-3.8-flash"
+FALLBACK_MODELS = ("gemini-3.1-flash-lite", "gemini-3.5-flash-lite", "gemini-3.6-flash")
 
 MAX_CHARS = 1800
 MAX_OUTPUT_TOKENS = 2000
